@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import argparse
 import copy
 import csv
 import subprocess
@@ -91,4 +92,13 @@ def main(csv_data_path, svg_template_path, pdf_output_path):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2], sys.argv[3])
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input_svg_file')
+    parser.add_argument('input_csv_file')
+    parser.add_argument('output_pdf_file')
+    args = parser.parse_args()
+    main(
+        csv_data_path=args.input_csv_file,
+        svg_template_path=args.input_svg_file,
+        pdf_output_path=args.output_pdf_file,
+    )
