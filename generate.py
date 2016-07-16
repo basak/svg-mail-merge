@@ -24,7 +24,7 @@ def replace(root, replacements):
     for template in root.findall(".//*[@class='template']"):
         for k, v in next(replacements).items():
             for e in template.findall(".//svg:tspan[@class='%s']" % k,
-                    namespaces=NSMAP):
+                                      namespaces=NSMAP):
                 e.text = v
 
 
