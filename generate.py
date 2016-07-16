@@ -3,6 +3,7 @@
 import argparse
 import copy
 import csv
+import os
 import subprocess
 import sys
 import tempfile
@@ -77,28 +78,60 @@ def concatenate_pdfs(input_pdf_paths, output_pdf_path):
     subprocess.check_call(args)
 
 
-def generate_pdf(data_iterator, svg_template_path, pdf_output_path):
+def generate_pdf(data_iterator, svg_template_path, pdf_output_path, overwrite):
     with tempfile.TemporaryDirectory() as tempdir:
         pdfs = []
         for tree in generate_page_svg_trees(data_iterator, svg_template_path):
             pdfs.append(svg_tree_to_pdf(tree, tempdir))
+        if not overwrite:
+            open(pdf_output_path, 'x').close()
         concatenate_pdfs(pdfs, pdf_output_path)
 
 
-def main(csv_data_path, svg_template_path, pdf_output_path):
+def process_csv(csv_data_path, svg_template_path, pdf_output_path, overwrite):
     with open(csv_data_path, 'r') as csv_fobj:
         reader = csv.DictReader(csv_fobj)
-        generate_pdf(iter(reader), svg_template_path, pdf_output_path)
+        generate_pdf(
+            data_iterator=iter(reader),
+            svg_template_path=svg_template_path,
+            pdf_output_path=pdf_output_path,
+            overwrite=overwrite,
+        )
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--force', '-f', help='overwrite PDF file', action='store_true')
     parser.add_argument('input_svg_file')
     parser.add_argument('input_csv_file')
     parser.add_argument('output_pdf_file')
     args = parser.parse_args()
-    main(
+    if not args.force and os.path.exists(args.output_pdf_file):
+        if os.isatty(sys.stdin.fileno()):
+            answer = input(
+                "File %s already exists. Overwrite? [y/N] " %
+                args.output_pdf_file,
+            )
+            if answer.lower() in ['y', 'yes']:
+                args.force = True
+            else:
+                print("Aborted")
+                sys.exit(1)
+        else:
+            print(
+                "Error: file %s already exists. Use --force to overwrite.\n"
+                "Aborted" % args.output_pdf_file,
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    process_csv(
         csv_data_path=args.input_csv_file,
         svg_template_path=args.input_svg_file,
         pdf_output_path=args.output_pdf_file,
+        overwrite=args.force,
     )
+
+
+if __name__ == '__main__':
+    main()
