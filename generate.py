@@ -20,27 +20,36 @@ def replace(root, replacements):
     Look for class="template" attributes. next(replacements) should provide a
     dictionary of "class=<key>" replacements for tspan objects inside the
     template.
+
+    Returns a tuple of (count, go_again). count is how many templates we
+    filled. go_again is whether replace needs to be called again, which is True
+    unless we hit StopIteration while reading from replacements.
     '''
+    count = 0
     for template in root.findall(".//*[@class='template']"):
-        for k, v in next(replacements).items():
+        try:
+            data_row = next(replacements)
+        except StopIteration:
+            return count, False
+        count += 1
+        for k, v in data_row.items():
             for e in template.findall(".//svg:tspan[@class='%s']" % k,
                                       namespaces=NSMAP):
                 e.text = v
+    return count, True
 
 
 def generate_page_svg_trees(data_iterator, svg_template_path):
     with open(svg_template_path) as svg_fobj:
         master_tree = etree.parse(svg_fobj)
 
-        try:
-            while True:
-                page_tree = copy.deepcopy(master_tree)
-                replace(page_tree.getroot(), data_iterator)
+        while True:
+            page_tree = copy.deepcopy(master_tree)
+            count, go_again = replace(page_tree.getroot(), data_iterator)
+            if count:
                 yield page_tree
-        except StopIteration:
-            # The final (possibly partial) page
-            # Minor bug: a blank page is considered a final partial page
-            yield page_tree
+            if not go_again:
+                break
 
 
 def svg_tree_to_pdf(tree, tempdir):
