@@ -28,17 +28,14 @@ def replace(root, replacements):
                 e.text = v
 
 
-def generate_page_svg_trees(csv_data_path, svg_template_path):
+def generate_page_svg_trees(data_iterator, svg_template_path):
     with open(svg_template_path) as svg_fobj:
         master_tree = etree.parse(svg_fobj)
 
-    with open(csv_data_path, 'r') as csv_fobj:
-        reader = csv.DictReader(csv_fobj)
-        read_iter = iter(reader)
         try:
             while True:
                 page_tree = copy.deepcopy(master_tree)
-                replace(page_tree.getroot(), read_iter)
+                replace(page_tree.getroot(), data_iterator)
                 yield page_tree
         except StopIteration:
             # The final (possibly partial) page
@@ -70,12 +67,18 @@ def concatenate_pdfs(input_pdf_paths, output_pdf_path):
     subprocess.check_call(args)
 
 
-def main(csv_data_path, svg_template_path, pdf_output_path):
+def generate_pdf(data_iterator, svg_template_path, pdf_output_path):
     with tempfile.TemporaryDirectory() as tempdir:
         pdfs = []
-        for tree in generate_page_svg_trees(csv_data_path, svg_template_path):
+        for tree in generate_page_svg_trees(data_iterator, svg_template_path):
             pdfs.append(svg_tree_to_pdf(tree, tempdir))
         concatenate_pdfs(pdfs, pdf_output_path)
+
+
+def main(csv_data_path, svg_template_path, pdf_output_path):
+    with open(csv_data_path, 'r') as csv_fobj:
+        reader = csv.DictReader(csv_fobj)
+        generate_pdf(iter(reader), svg_template_path, pdf_output_path)
 
 
 if __name__ == '__main__':
