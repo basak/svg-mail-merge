@@ -15,6 +15,12 @@ NSMAP = {
 
 
 def replace(root, replacements):
+    '''Apply replacements to an SVG ElementTree
+
+    Look for class="template" attributes. next(replacements) should provide a
+    dictionary of "class=<key>" replacements for tspan objects inside the
+    template.
+    '''
     for template in root.findall(".//*[@class='template']"):
         for k, v in next(replacements).items():
             for e in template.findall(".//svg:tspan[@class='%s']" % k,
