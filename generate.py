@@ -62,8 +62,16 @@ def replace(root, replacements):
                 e.text = v
             for e in template.findall(".//svg:rect[@class='%s']" % k,
                                       namespaces=NSMAP):
+                # If the rect has a transform, that needs to be applied
+                # in a wrapping <g>.
+                if e.get('transform'):
+                    replacement = etree.Element('g')
+                    replacement.set('transform', e.get('transform'))
+                    replacement.append(v)
+                else:
+                    replacement = v
                 # Replace rect with XML (expected to be an <svg> element)
-                e.getparent().replace(e, v)
+                e.getparent().replace(e, replacement)
                 for attr in ['class', 'x', 'y', 'width', 'height']:
                     v.set(attr, e.get(attr))
 
