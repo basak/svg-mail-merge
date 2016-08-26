@@ -1,0 +1,3 @@
+[submodule "pyqrcode"]
+	path = vendor/pyqrcode
+	url = git://github.com/mnooner256/pyqrcode

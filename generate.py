@@ -3,17 +3,38 @@
 import argparse
 import copy
 import csv
+import io
 import os
 import subprocess
 import sys
 import tempfile
 
 from lxml import etree
+import pyqrcode
 
 
 NSMAP = {
     'svg': "http://www.w3.org/2000/svg",
 }
+
+
+class QrCreator:
+    def __init__(self, source, key):
+        self.source = iter(source)
+        self.key = key
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        n = dict(next(self.source))
+        qr = pyqrcode.create(n[self.key], mode='binary', error='L')
+        f = io.BytesIO()
+        qr.svg(f, omithw=True)
+        f.seek(0)
+        xml = etree.parse(f)
+        n[self.key] = xml.getroot()
+        return n
 
 
 def replace(root, replacements):
@@ -37,7 +58,15 @@ def replace(root, replacements):
         for k, v in data_row.items():
             for e in template.findall(".//svg:tspan[@class='%s']" % k,
                                       namespaces=NSMAP):
+                # Replace text with data as-is
                 e.text = v
+            for e in template.findall(".//svg:rect[@class='%s']" % k,
+                                      namespaces=NSMAP):
+                # Replace rect with XML (expected to be an <svg> element)
+                e.getparent().replace(e, v)
+                for attr in ['class', 'x', 'y', 'width', 'height']:
+                    v.set(attr, e.get(attr))
+
     return count, True
 
 
@@ -88,9 +117,16 @@ def generate_pdf(data_iterator, svg_template_path, pdf_output_path, overwrite):
         concatenate_pdfs(pdfs, pdf_output_path)
 
 
-def process_csv(csv_data_path, svg_template_path, pdf_output_path, overwrite):
+def process_csv(csv_data_path, svg_template_path, pdf_output_path,
+        overwrite, qr=None):
     with open(csv_data_path, 'r') as csv_fobj:
-        reader = csv.DictReader(csv_fobj)
+        csv_reader = csv.DictReader(csv_fobj)
+
+        if qr:
+            reader = QrCreator(csv_reader, qr)
+        else:
+            reader = csv_reader
+
         generate_pdf(
             data_iterator=iter(reader),
             svg_template_path=svg_template_path,
@@ -103,6 +139,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--force', '-f', help='overwrite PDF file', action='store_true')
+    parser.add_argument('--qr')
     parser.add_argument('input_svg_file')
     parser.add_argument('input_csv_file')
     parser.add_argument('output_pdf_file')
@@ -130,6 +167,7 @@ def main():
         svg_template_path=args.input_svg_file,
         pdf_output_path=args.output_pdf_file,
         overwrite=args.force,
+        qr=args.qr,
     )
 
 
