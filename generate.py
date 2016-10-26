@@ -25,8 +25,8 @@ MergeRow = collections.namedtuple('MergeRow', 'class_name class_type data')
 class MergeCsvReader:
     def __init__(self, fobj):
         self._csv = iter(csv.reader(fobj))
-        class_names = next(self._csv)
-        class_types = next(self._csv)
+        self._class_names = next(self._csv)
+        self._class_types = next(self._csv)
 
     def __iter__(self):
         return self
@@ -36,35 +36,50 @@ class MergeCsvReader:
         return [
             MergeRow(class_name=class_name, class_type=class_type, data=data)
             for class_name, class_type, data
-            in zip(class_names, class_types, data_row)
+            in zip(self._class_names, self._class_types, data_row)
         ]
 
 
-class QrCreator:
-    def __init__(self, source, key):
-        self.source = iter(source)
-        self.key = key
+def _replace_tspan(template, class_name, data):
+    for e in template.findall(".//svg:tspan[@class='%s']" % class_name,
+                              namespaces=NSMAP):
+        # Replace text with data as-is
+        e.text = data
 
-    def __iter__(self):
-        return self
 
-    def __next__(self):
-        n = dict(next(self.source))
-        qr = pyqrcode.create(n[self.key], mode='binary', error='L')
-        f = io.BytesIO()
-        qr.svg(f, omithw=True)
-        f.seek(0)
-        xml = etree.parse(f)
-        n[self.key] = xml.getroot()
-        return n
+def _create_qr_xml(data):
+    qr = pyqrcode.create(data, mode='binary', error='L')
+    f = io.BytesIO()
+    qr.svg(f, omithw=True)
+    f.seek(0)
+    xml = etree.parse(f)
+    return xml.getroot()
+
+
+def _replace_qr(template, class_name, data):
+    qr_xml_template = _create_qr_xml(data)
+    for e in template.findall(".//svg:rect[@class='%s']" % class_name,
+                              namespaces=NSMAP):
+        qr_xml = copy.deepcopy(qr_xml_template)
+        # If the rect has a transform, that needs to be applied
+        # in a wrapping <g>.
+        if e.get('transform'):
+            replacement = etree.Element('g')
+            replacement.set('transform', e.get('transform'))
+            replacement.append(qr_xml)
+        else:
+            replacement = qr_xml
+        # Replace rect with XML (expected to be an <svg> element)
+        e.getparent().replace(e, replacement)
+        for attr in ['class', 'x', 'y', 'width', 'height']:
+                    qr_xml.set(attr, e.get(attr))
 
 
 def replace(root, replacements):
     '''Apply replacements to an SVG ElementTree
 
-    Look for class="template" attributes. next(replacements) should provide a
-    dictionary of "class=<key>" replacements for tspan objects inside the
-    template.
+    Look for class="template" attributes. next(replacements) should provide
+    MergeRow instances.
 
     Returns a tuple of (count, go_again). count is how many templates we
     filled. go_again is whether replace needs to be called again, which is True
@@ -77,25 +92,11 @@ def replace(root, replacements):
         except StopIteration:
             return count, False
         count += 1
-        for k, v in data_row.items():
-            for e in template.findall(".//svg:tspan[@class='%s']" % k,
-                                      namespaces=NSMAP):
-                # Replace text with data as-is
-                e.text = v
-            for e in template.findall(".//svg:rect[@class='%s']" % k,
-                                      namespaces=NSMAP):
-                # If the rect has a transform, that needs to be applied
-                # in a wrapping <g>.
-                if e.get('transform'):
-                    replacement = etree.Element('g')
-                    replacement.set('transform', e.get('transform'))
-                    replacement.append(v)
-                else:
-                    replacement = v
-                # Replace rect with XML (expected to be an <svg> element)
-                e.getparent().replace(e, replacement)
-                for attr in ['class', 'x', 'y', 'width', 'height']:
-                    v.set(attr, e.get(attr))
+        for class_name, class_type, data in data_row:
+            {
+                'tspan': _replace_tspan,
+                'qr': _replace_qr,
+            }[class_type](template, class_name, data)
 
     return count, True
 
@@ -148,17 +149,10 @@ def generate_pdf(data_iterator, svg_template_path, pdf_output_path, overwrite):
 
 
 def process_csv(csv_data_path, svg_template_path, pdf_output_path,
-        overwrite, qr=None):
+        overwrite):
     with open(csv_data_path, 'r', newline='') as csv_fobj:
-        csv_reader = csv.DictReader(csv_fobj)
-
-        if qr:
-            reader = QrCreator(csv_reader, qr)
-        else:
-            reader = csv_reader
-
         generate_pdf(
-            data_iterator=iter(reader),
+            data_iterator=MergeCsvReader(csv_fobj),
             svg_template_path=svg_template_path,
             pdf_output_path=pdf_output_path,
             overwrite=overwrite,
@@ -169,7 +163,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--force', '-f', help='overwrite PDF file', action='store_true')
-    parser.add_argument('--qr')
     parser.add_argument('input_svg_file')
     parser.add_argument('input_csv_file')
     parser.add_argument('output_pdf_file')
@@ -197,7 +190,6 @@ def main():
         svg_template_path=args.input_svg_file,
         pdf_output_path=args.output_pdf_file,
         overwrite=args.force,
-        qr=args.qr,
     )
 
 
