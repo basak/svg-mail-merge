@@ -117,7 +117,7 @@ def generate_page_svg_trees(data_iterator, svg_template_path):
             count, go_again = replace(page_tree.getroot(), data_iterator)
             if count:
                 yield page_tree
-            if not go_again:
+            if not count or not go_again:
                 break
 
 
