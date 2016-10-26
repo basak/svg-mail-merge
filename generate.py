@@ -127,7 +127,7 @@ def generate_pdf(data_iterator, svg_template_path, pdf_output_path, overwrite):
 
 def process_csv(csv_data_path, svg_template_path, pdf_output_path,
         overwrite, qr=None):
-    with open(csv_data_path, 'r') as csv_fobj:
+    with open(csv_data_path, 'r', newline='') as csv_fobj:
         csv_reader = csv.DictReader(csv_fobj)
 
         if qr:
