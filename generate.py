@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import argparse
+import collections
 import copy
 import csv
 import io
@@ -16,6 +17,27 @@ import pyqrcode
 NSMAP = {
     'svg': "http://www.w3.org/2000/svg",
 }
+
+
+MergeRow = collections.namedtuple('MergeRow', 'class_name class_type data')
+
+
+class MergeCsvReader:
+    def __init__(self, fobj):
+        self._csv = iter(csv.reader(fobj))
+        class_names = next(self._csv)
+        class_types = next(self._csv)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        data_row = next(self._csv)
+        return [
+            MergeRow(class_name=class_name, class_type=class_type, data=data)
+            for class_name, class_type, data
+            in zip(class_names, class_types, data_row)
+        ]
 
 
 class QrCreator:
