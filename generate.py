@@ -75,6 +75,12 @@ def _replace_qr(template, class_name, data):
                     qr_xml.set(attr, e.get(attr))
 
 
+def _replace_rectwidth(template, class_name, data):
+    for e in template.findall(".//svg:rect[@class='%s']" % class_name,
+                              namespaces=NSMAP):
+        e.set('width', str(float(e.get('width')) * float(data)))
+
+
 def replace(root, replacements):
     '''Apply replacements to an SVG ElementTree
 
@@ -96,6 +102,7 @@ def replace(root, replacements):
             {
                 'tspan': _replace_tspan,
                 'qr': _replace_qr,
+                'rectwidth': _replace_rectwidth,
             }[class_type](template, class_name, data)
 
     return count, True
