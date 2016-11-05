@@ -47,6 +47,24 @@ def _replace_tspan(template, class_name, data):
         e.text = data
 
 
+def _replace_rect(template, rect_replacement_template, class_name):
+    for e in template.findall(".//svg:rect[@class='%s']" % class_name,
+                              namespaces=NSMAP):
+        replacement_xml = copy.deepcopy(rect_replacement_template)
+        # If the rect has a transform, that needs to be applied
+        # in a wrapping <g>.
+        if e.get('transform'):
+            replacement = etree.Element('g')
+            replacement.set('transform', e.get('transform'))
+            replacement.append(replacement_xml)
+        else:
+            replacement = replacement_xml
+        # Replace rect with XML
+        e.getparent().replace(e, replacement)
+        for attr in ['class', 'x', 'y', 'width', 'height']:
+                    replacement_xml.set(attr, e.get(attr))
+
+
 def _create_qr_xml(data):
     qr = pyqrcode.create(data, mode='binary', error='L')
     f = io.BytesIO()
@@ -58,21 +76,7 @@ def _create_qr_xml(data):
 
 def _replace_qr(template, class_name, data):
     qr_xml_template = _create_qr_xml(data)
-    for e in template.findall(".//svg:rect[@class='%s']" % class_name,
-                              namespaces=NSMAP):
-        qr_xml = copy.deepcopy(qr_xml_template)
-        # If the rect has a transform, that needs to be applied
-        # in a wrapping <g>.
-        if e.get('transform'):
-            replacement = etree.Element('g')
-            replacement.set('transform', e.get('transform'))
-            replacement.append(qr_xml)
-        else:
-            replacement = qr_xml
-        # Replace rect with XML (expected to be an <svg> element)
-        e.getparent().replace(e, replacement)
-        for attr in ['class', 'x', 'y', 'width', 'height']:
-                    qr_xml.set(attr, e.get(attr))
+    _replace_rect(template, qr_xml_template, class_name)
 
 
 def _replace_rectwidth(template, class_name, data):
