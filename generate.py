@@ -65,6 +65,12 @@ def _replace_rect(template, rect_replacement_template, class_name):
                     replacement_xml.set(attr, e.get(attr))
 
 
+def _replace_imagefile(template, class_name, path):
+    image_xml_template = etree.Element('image', nsmap=NSMAP)
+    image_xml_template.set('{http://www.w3.org/1999/xlink}href', path)
+    _replace_rect(template, image_xml_template, class_name)
+
+
 def _create_qr_xml(data):
     qr = pyqrcode.create(data, mode='binary', error='L')
     f = io.BytesIO()
@@ -107,6 +113,7 @@ def replace(root, replacements):
                 'tspan': _replace_tspan,
                 'qr': _replace_qr,
                 'rectwidth': _replace_rectwidth,
+                'imagefile': _replace_imagefile,
             }[class_type](template, class_name, data)
 
     return count, True
