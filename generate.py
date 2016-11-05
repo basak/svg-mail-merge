@@ -40,6 +40,13 @@ class MergeCsvReader:
         ]
 
 
+def _replace_text(template, class_name, data):
+    for e in template.findall(".//svg:text[@class='%s']" % class_name,
+                              namespaces=NSMAP):
+        # Replace text with data as-is
+        e.text = data
+
+
 def _replace_tspan(template, class_name, data):
     for e in template.findall(".//svg:tspan[@class='%s']" % class_name,
                               namespaces=NSMAP):
@@ -110,6 +117,7 @@ def replace(root, replacements):
         count += 1
         for class_name, class_type, data in data_row:
             {
+                'text': _replace_text,
                 'tspan': _replace_tspan,
                 'qr': _replace_qr,
                 'rectwidth': _replace_rectwidth,
